@@ -18,6 +18,8 @@
 package org.kiwix.kiwixmobile.help
 
 import android.os.Build
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.IdlingRegistry
@@ -31,7 +33,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.kiwix.kiwixmobile.BaseActivityTest
 import org.kiwix.kiwixmobile.R
-import org.kiwix.kiwixmobile.core.utils.LanguageUtils.Companion.handleLocaleChange
 import org.kiwix.kiwixmobile.core.utils.SharedPreferenceUtil
 import org.kiwix.kiwixmobile.main.KiwixMainActivity
 import org.kiwix.kiwixmobile.testutils.RetryRule
@@ -54,13 +55,7 @@ class HelpFragmentTest : BaseActivityTest() {
     activityScenario = ActivityScenario.launch(KiwixMainActivity::class.java).apply {
       moveToState(Lifecycle.State.RESUMED)
       onActivity {
-        handleLocaleChange(
-          it,
-          "en",
-          SharedPreferenceUtil(context).apply {
-            lastDonationPopupShownInMilliSeconds = System.currentTimeMillis()
-          }
-        )
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
       }
     }
   }

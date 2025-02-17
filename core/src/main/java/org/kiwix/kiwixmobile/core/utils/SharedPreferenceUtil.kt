@@ -88,9 +88,6 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
   val prefLanguage: String
     get() = sharedPreferences.getString(PREF_LANG, "") ?: Locale.ROOT.toString()
 
-  val prefDeviceDefaultLanguage: String
-    get() = sharedPreferences.getString(PREF_DEVICE_DEFAULT_LANG, "") ?: ""
-
   val prefIsBookmarksMigrated: Boolean
     get() = sharedPreferences.getBoolean(PREF_BOOKMARKS_MIGRATED, false)
 
@@ -134,12 +131,9 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
     context.getExternalFilesDirs(null)[0]?.path
       ?: context.filesDir.path // a workaround for emulators
 
-  fun defaultPublicStorage(): String =
+  private fun defaultPublicStorage(): String =
     ContextWrapper(context).externalMediaDirs[0]?.path
       ?: context.filesDir.path // a workaround for emulators
-
-  fun getPrefStorageTitle(defaultTitle: String): String =
-    sharedPreferences.getString(PREF_STORAGE_TITLE, defaultTitle) ?: defaultTitle
 
   fun putPrefBookMarkMigrated(isMigrated: Boolean) =
     sharedPreferences.edit { putBoolean(PREF_BOOKMARKS_MIGRATED, isMigrated) }
@@ -159,9 +153,6 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
   fun putPrefLanguage(language: String) =
     sharedPreferences.edit { putString(PREF_LANG, language) }
 
-  fun putPrefDeviceDefaultLanguage(language: String) =
-    sharedPreferences.edit { putString(PREF_DEVICE_DEFAULT_LANG, language) }
-
   fun putPerAppLanguageMigration(isMigrated: Boolean) =
     sharedPreferences.edit { putBoolean(PER_APP_LANGUAGE_MIGRATION, isMigrated) }
 
@@ -172,9 +163,6 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
     sharedPreferences.edit { putBoolean(PREF_WIFI_ONLY, wifiOnly) }
     _prefWifiOnlys.onNext(wifiOnly)
   }
-
-  fun putPrefStorageTitle(storageTitle: String) =
-    sharedPreferences.edit { putString(PREF_STORAGE_TITLE, storageTitle) }
 
   fun putPrefStorage(storage: String) {
     sharedPreferences.edit { putString(PREF_STORAGE, storage) }
@@ -304,7 +292,6 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
   companion object {
     // Prefs
     const val PREF_LANG = "pref_language_chooser"
-    const val PREF_DEVICE_DEFAULT_LANG = "pref_device_default_language"
     const val PREF_STORAGE = "pref_select_folder"
     const val PREF_INTERNAL_STORAGE = "pref_internal_storage"
     const val PREF_EXTERNAL_STORAGE = "pref_external_storage"
@@ -317,7 +304,6 @@ class SharedPreferenceUtil @Inject constructor(val context: Context) {
     private const val PREF_BACK_TO_TOP = "pref_backtotop"
     private const val PREF_FULLSCREEN = "pref_fullscreen"
     private const val PREF_NEW_TAB_BACKGROUND = "pref_newtab_background"
-    private const val PREF_STORAGE_TITLE = "pref_selected_title"
     const val PREF_EXTERNAL_LINK_POPUP = "pref_external_link_popup"
     const val PREF_SHOW_STORAGE_OPTION = "show_storgae_option"
     private const val PREF_IS_FIRST_RUN = "isFirstRun"

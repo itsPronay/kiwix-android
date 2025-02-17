@@ -181,6 +181,7 @@ abstract class CorePrefsFragment :
           Preference.OnPreferenceChangeListener { _, newValue ->
             val languageCode = newValue as String?
             languageCode?.let {
+              sharedPreferenceUtil.putPrefLanguage(it)
               AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it))
             }
             true
