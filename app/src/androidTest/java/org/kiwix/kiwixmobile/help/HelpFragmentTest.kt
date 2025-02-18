@@ -86,7 +86,11 @@ class HelpFragmentTest : BaseActivityTest() {
       clickOnHowToUpdateContent()
       assertWhyCopyMoveFilesToAppPublicDirectoryIsNotVisible()
     }
-    LeakAssertions.assertNoLeaks()
+    if (Build.VERSION.SDK_INT != Build.VERSION_CODES.TIRAMISU) {
+      // Temporarily disabling leak checks on Android 13,
+      // as it is incorrectly detecting leaks in Android's internal classes.
+      LeakAssertions.assertNoLeaks()
+    }
   }
 
   @Test

@@ -17,6 +17,7 @@
  */
 package org.kiwix.kiwixmobile.download
 
+import android.os.Build
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
@@ -229,7 +230,11 @@ class DownloadTest : BaseActivityTest() {
         "Couldn't find downloaded file ' Off the Grid ' Original Exception: ${e.message}"
       )
     }
-    LeakAssertions.assertNoLeaks()
+    if (Build.VERSION.SDK_INT != Build.VERSION_CODES.TIRAMISU) {
+      // Temporarily disabling leak checks on Android 13,
+      // as it is incorrectly detecting leaks in Android's internal classes.
+      LeakAssertions.assertNoLeaks()
+    }
   }
 
   @After
