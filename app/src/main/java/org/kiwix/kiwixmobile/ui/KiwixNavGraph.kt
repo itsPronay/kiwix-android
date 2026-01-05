@@ -70,6 +70,7 @@ import org.kiwix.kiwixmobile.core.utils.TAG_FROM_TAB_SWITCHER
 import org.kiwix.kiwixmobile.help.KiwixHelpViewModel
 import org.kiwix.kiwixmobile.intro.IntroScreenRoute
 import org.kiwix.kiwixmobile.language.LanguageFragment
+import org.kiwix.kiwixmobile.language.LanguageScreenRoute
 import org.kiwix.kiwixmobile.localFileTransfer.LocalFileTransferFragment
 import org.kiwix.kiwixmobile.localFileTransfer.URIS_KEY
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryFragment
@@ -147,9 +148,10 @@ fun KiwixNavGraph(
       }
     }
     composable(KiwixDestination.Language.route) {
-      FragmentContainer(R.id.languageFragmentContainer) {
-        LanguageFragment()
-      }
+      LanguageScreenRoute(
+        viewModelFactory = viewModelFactory,
+        navigateBack = navController::popBackStack
+      )
     }
     composable(
       KiwixDestination.ZimHost.route,
