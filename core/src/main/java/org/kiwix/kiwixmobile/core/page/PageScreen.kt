@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,8 +42,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -50,17 +56,29 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.kiwix.kiwixmobile.core.R
 import org.kiwix.kiwixmobile.core.extensions.ActivityExtensions.isCustomApp
 import org.kiwix.kiwixmobile.core.extensions.bottomShadow
 import org.kiwix.kiwixmobile.core.extensions.hideKeyboardOnLazyColumnScroll
 import org.kiwix.kiwixmobile.core.main.CoreMainActivity
+import org.kiwix.kiwixmobile.core.page.DELETE_MENU_ICON_TESTING_TAG
+import org.kiwix.kiwixmobile.core.page.SEARCH_ICON_TESTING_TAG
 import org.kiwix.kiwixmobile.core.page.adapter.OnItemClickListener
 import org.kiwix.kiwixmobile.core.page.adapter.Page
 import org.kiwix.kiwixmobile.core.page.history.adapter.HistoryListItem.DateItem
+import org.kiwix.kiwixmobile.core.page.viewmodel.Action
+import org.kiwix.kiwixmobile.core.page.viewmodel.PageState
+import org.kiwix.kiwixmobile.core.page.viewmodel.PageViewModel
+import org.kiwix.kiwixmobile.core.page.viewmodel.PageViewModelClickListener
 import org.kiwix.kiwixmobile.core.ui.components.KiwixAppBar
 import org.kiwix.kiwixmobile.core.ui.components.KiwixSearchView
+import org.kiwix.kiwixmobile.core.ui.components.NavigationIcon
 import org.kiwix.kiwixmobile.core.ui.models.ActionMenuItem
+import org.kiwix.kiwixmobile.core.ui.models.IconItem
 import org.kiwix.kiwixmobile.core.ui.theme.KiwixTheme
 import org.kiwix.kiwixmobile.core.ui.theme.White
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.FOURTEEN_SP
@@ -68,6 +86,7 @@ import org.kiwix.kiwixmobile.core.utils.ComposeDimens.KIWIX_TOOLBAR_SHADOW_ELEVA
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.PAGE_SWITCH_LEFT_RIGHT_MARGIN
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.PAGE_SWITCH_ROW_BOTTOM_MARGIN
 import org.kiwix.kiwixmobile.core.utils.ComposeDimens.SIXTEEN_DP
+import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.threeten.bp.LocalDate
 import org.threeten.bp.format.DateTimeFormatter
 import org.threeten.bp.format.DateTimeParseException
@@ -76,13 +95,123 @@ const val SWITCH_TEXT_TESTING_TAG = "switchTextTestingTag"
 const val NO_ITEMS_TEXT_TESTING_TAG = "noItemsTextTestingTag"
 const val PAGE_LIST_TEST_TAG = "pageListTestingTag"
 
-@Suppress("ComposableLambdaParameterNaming")
+/**
+ * A generic PageScreenRoute that works with any PageViewModel implementation.
+ * This follows the pattern of HelpScreenRoute for full Compose navigation.
+ *
+ * @param navigateBack Callback to navigate back from this screen
+ * @param pageViewModel The ViewModel that manages page data and actions
+ * @param screenTitleRes String resource for the screen title
+ * @param noItemsString String to display when there are no items
+ * @param switchString String for the switch label
+ * @param searchQueryHint String hint for the search field
+ * @param deleteIconTitleRes String resource for delete icon content description
+ * @param switchIsCheckedFlow Flow that indicates if the switch is checked
+ * @param alertDialogShower AlertDialogShower for showing dialogs
+ * @param pageViewModelClickListener Optional listener for item clicks. If null, uses default behavior.
+ */
+@Suppress("LongMethod", "LongParameterList")
+@Composable
+fun <T : Page, S : PageState<T>> PageScreenRoute(
+  navigateBack: () -> Unit,
+  pageViewModel: PageViewModel<T, S>,
+  screenTitleRes: Int,
+  noItemsString: String,
+  switchString: String,
+  searchQueryHint: String,
+  deleteIconTitleRes: Int,
+  switchIsCheckedFlow: Flow<Boolean>,
+  alertDialogShower: AlertDialogShower,
+  pageViewModelClickListener: PageViewModelClickListener? = null
+) {
+  val state by pageViewModel.state.collectAsStateWithLifecycle()
+  val activity = LocalActivity.current as CoreMainActivity
+
+  // Set up the alert dialog shower in the ViewModel
+  LaunchedEffect(alertDialogShower) {
+    pageViewModel.alertDialogShower = alertDialogShower
+    pageViewModel.lifeCycleScope = activity.lifecycleScope
+  }
+
+  // Set up item click listener if provided
+  LaunchedEffect(pageViewModelClickListener) {
+    pageViewModelClickListener?.let {
+      pageViewModel.setOnItemClickListener(it)
+    }
+  }
+
+  var isSearchActive by remember { mutableStateOf(false) }
+  var searchText by remember { mutableStateOf("") }
+
+  PageScreen(
+    state = state,
+    screenTitleRes = screenTitleRes,
+    noItemsString = noItemsString,
+    switchString = switchString,
+    searchQueryHint = searchQueryHint,
+    deleteIconTitleRes = deleteIconTitleRes,
+    switchIsCheckedFlow = switchIsCheckedFlow,
+    isSearchActive = isSearchActive,
+    searchText = searchText,
+    onSearchTextChange = { newText ->
+      searchText = newText
+      pageViewModel.actions.tryEmit(Action.Filter(newText.trim()))
+    },
+    onClearSearch = {
+      searchText = ""
+      pageViewModel.actions.tryEmit(Action.Filter(""))
+    },
+    onSearchClick = { isSearchActive = true },
+    onDeleteClick = { pageViewModel.actions.tryEmit(Action.UserClickedDeleteButton) },
+    onSwitchCheckedChange = { isChecked ->
+      pageViewModel.actions.tryEmit(Action.UserClickedShowAllToggle(isChecked))
+    },
+    onItemClick = { page ->
+      if (state.isInSelectionState) {
+        pageViewModel.actions.tryEmit(Action.OnItemLongClick(page))
+      } else {
+        pageViewModel.actions.tryEmit(Action.OnItemClick(page))
+      }
+    },
+    onItemLongClick = { page ->
+      pageViewModel.actions.tryEmit(Action.OnItemLongClick(page))
+    },
+    navigationIcon = {
+      NavigationIcon(
+        onClick = {
+          if (isSearchActive) {
+            isSearchActive = false
+            searchText = ""
+            pageViewModel.actions.tryEmit(Action.Filter(""))
+          } else {
+            navigateBack()
+          }
+        }
+      )
+    }
+  )
+}
+
+@Suppress("ComposableLambdaParameterNaming", "LongMethod", "LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PageScreen(
-  state: PageFragmentScreenState,
-  itemClickListener: OnItemClickListener,
-  actionMenuItems: List<ActionMenuItem>,
+fun <T : Page, S : PageState<T>> PageScreen(
+  state: S,
+  screenTitleRes: Int,
+  noItemsString: String,
+  switchString: String,
+  searchQueryHint: String,
+  deleteIconTitleRes: Int,
+  switchIsCheckedFlow: Flow<Boolean>,
+  isSearchActive: Boolean,
+  searchText: String,
+  onSearchTextChange: (String) -> Unit,
+  onClearSearch: () -> Unit,
+  onSearchClick: () -> Unit,
+  onDeleteClick: () -> Unit,
+  onSwitchCheckedChange: (Boolean) -> Unit,
+  onItemClick: (Page) -> Unit,
+  onItemLongClick: (Page) -> Unit,
   navigationIcon: @Composable () -> Unit
 ) {
   KiwixTheme {
@@ -90,16 +219,36 @@ fun PageScreen(
       topBar = {
         Column {
           KiwixAppBar(
-            title = stringResource(state.screenTitle),
+            title = stringResource(screenTitleRes),
             navigationIcon = navigationIcon,
-            actionMenuItems = actionMenuItems,
-            searchBar = searchBarIfActive(state)
+            actionMenuItems = actionMenuItems(
+              isSearchActive = isSearchActive,
+              onSearchClick = onSearchClick,
+              onDeleteClick = onDeleteClick,
+              deleteIconTitleRes = deleteIconTitleRes
+            ),
+            searchBar = if (isSearchActive) {
+              {
+                KiwixSearchView(
+                  placeholder = searchQueryHint,
+                  value = searchText,
+                  searchViewTextFiledTestTag = "",
+                  onValueChange = onSearchTextChange,
+                  onClearClick = onClearSearch
+                )
+              }
+            } else null
           )
-          PageSwitchRow(state)
+          PageSwitchRow(
+            switchString = switchString,
+            switchIsCheckedFlow = switchIsCheckedFlow,
+            switchIsEnabled = !state.isInSelectionState,
+            onSwitchCheckedChange = onSwitchCheckedChange
+          )
         }
       }
     ) { padding ->
-      val items = state.pageState.pageItems
+      val items = state.pageItems
       Box(
         modifier = Modifier
           .padding(
@@ -111,7 +260,7 @@ fun PageScreen(
       ) {
         if (items.isEmpty()) {
           Text(
-            text = state.noItemsString,
+            text = noItemsString,
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier
               .align(Alignment.Center)
@@ -120,7 +269,8 @@ fun PageScreen(
         } else {
           PageList(
             state = state,
-            itemClickListener = itemClickListener
+            onItemClick = onItemClick,
+            onItemLongClick = onItemLongClick
           )
         }
       }
@@ -128,10 +278,76 @@ fun PageScreen(
   }
 }
 
+/**
+ * Backward-compatible overload for PageScreen that accepts PageFragmentScreenState.
+ * This is used by the existing PageFragment.
+ */
+@Suppress(
+  "ComposableLambdaParameterNaming",
+  "LongMethod",
+  "LongParameterList",
+  "UnusedParameter"
+)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PageList(
+fun PageScreen(
   state: PageFragmentScreenState,
-  itemClickListener: OnItemClickListener
+  itemClickListener: OnItemClickListener,
+  actionMenuItems: List<ActionMenuItem>,
+  navigationIcon: @Composable () -> Unit
+) {
+  PageScreen(
+    state = state.pageState,
+    screenTitleRes = state.screenTitle,
+    noItemsString = state.noItemsString,
+    switchString = state.switchString,
+    searchQueryHint = state.searchQueryHint,
+    deleteIconTitleRes = state.deleteIconTitle,
+    switchIsCheckedFlow = state.switchIsCheckedFlow,
+    isSearchActive = state.isSearchActive,
+    searchText = state.searchText,
+    onSearchTextChange = state.searchValueChangedListener,
+    onClearSearch = state.clearSearchButtonClickListener,
+    onSearchClick = { }, // handled by actionMenuItems
+    onDeleteClick = { }, // handled by actionMenuItems
+    onSwitchCheckedChange = state.onSwitchCheckedChanged,
+    onItemClick = { itemClickListener.onItemClick(it) },
+    onItemLongClick = { itemClickListener.onItemLongClick(it) },
+    navigationIcon = navigationIcon
+  )
+}
+
+@Composable
+private fun actionMenuItems(
+  isSearchActive: Boolean,
+  onSearchClick: () -> Unit,
+  onDeleteClick: () -> Unit,
+  deleteIconTitleRes: Int
+): List<ActionMenuItem> {
+  return listOfNotNull(
+    when {
+      !isSearchActive -> ActionMenuItem(
+        icon = IconItem.Drawable(R.drawable.action_search),
+        contentDescription = R.string.search_label,
+        onClick = onSearchClick,
+        testingTag = SEARCH_ICON_TESTING_TAG
+      )
+      else -> null
+    },
+    ActionMenuItem(
+      icon = IconItem.Vector(Icons.Default.Delete),
+      contentDescription = deleteIconTitleRes,
+      onClick = onDeleteClick,
+      testingTag = DELETE_MENU_ICON_TESTING_TAG
+    )
+  )
+}
+
+@Composable
+private fun <T : Page, S : PageState<T>> PageList(
+  state: S,
+  onItemClick: (Page) -> Unit,
+  onItemLongClick: (Page) -> Unit
 ) {
   val listState = rememberLazyListState()
   LazyColumn(
@@ -141,9 +357,14 @@ private fun PageList(
       // hides keyboard when scrolled
       .hideKeyboardOnLazyColumnScroll(listState)
   ) {
-    itemsIndexed(state.pageState.visiblePageItems) { index, item ->
+    itemsIndexed(state.visiblePageItems) { index, item ->
       when (item) {
-        is Page -> PageListItem(index = index, page = item, itemClickListener = itemClickListener)
+        is Page -> PageListItem(
+          index = index,
+          page = item,
+          onItemClick = onItemClick,
+          onItemLongClick = onItemLongClick
+        )
         is DateItem -> DateItemText(item)
       }
     }
@@ -151,30 +372,16 @@ private fun PageList(
 }
 
 @Composable
-private fun searchBarIfActive(
-  state: PageFragmentScreenState
-): (@Composable () -> Unit)? = if (state.isSearchActive) {
-  {
-    KiwixSearchView(
-      placeholder = state.searchQueryHint,
-      value = state.searchText,
-      searchViewTextFiledTestTag = "",
-      onValueChange = { state.searchValueChangedListener(it) },
-      onClearClick = { state.clearSearchButtonClickListener.invoke() }
-    )
-  }
-} else {
-  null
-}
-
-@Composable
 fun PageSwitchRow(
-  state: PageFragmentScreenState
+  switchString: String,
+  switchIsCheckedFlow: Flow<Boolean>,
+  switchIsEnabled: Boolean,
+  onSwitchCheckedChange: (Boolean) -> Unit
 ) {
   val context = LocalActivity.current as CoreMainActivity
   // hide switches for custom apps, see more info here https://github.com/kiwix/kiwix-android/issues/3523
   if (!context.isCustomApp()) {
-    val isChecked by state.switchIsCheckedFlow.collectAsState(true)
+    val isChecked by switchIsCheckedFlow.collectAsState(true)
     Surface(modifier = Modifier.bottomShadow(KIWIX_TOOLBAR_SHADOW_ELEVATION)) {
       Row(
         modifier = Modifier
@@ -185,15 +392,15 @@ fun PageSwitchRow(
         verticalAlignment = Alignment.CenterVertically
       ) {
         Text(
-          state.switchString,
+          switchString,
           color = MaterialTheme.colorScheme.onBackground,
           style = TextStyle(fontSize = FOURTEEN_SP),
           modifier = Modifier.testTag(SWITCH_TEXT_TESTING_TAG)
         )
         Switch(
           checked = isChecked,
-          onCheckedChange = { state.onSwitchCheckedChanged(it) },
-          enabled = state.switchIsEnabled,
+          onCheckedChange = onSwitchCheckedChange,
+          enabled = switchIsEnabled,
           modifier = Modifier
             .padding(horizontal = PAGE_SWITCH_LEFT_RIGHT_MARGIN),
           colors = SwitchDefaults.colors(

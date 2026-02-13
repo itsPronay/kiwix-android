@@ -85,6 +85,7 @@ class CustomMainActivity : CoreMainActivity() {
         uiCoroutineScope = uiCoroutineScope,
         customBackHandler = customBackHandler,
         viewModelFactory = viewModelFactory,
+        kiwixDataStore = kiwixDataStore,
         alertDialogShower = alertDialogShower
       )
       DialogHost(alertDialogShower)

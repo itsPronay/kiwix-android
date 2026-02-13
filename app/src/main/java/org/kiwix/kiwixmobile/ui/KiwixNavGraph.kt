@@ -61,13 +61,17 @@ import org.kiwix.kiwixmobile.core.main.ZIM_FILE_URI_KEY
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_FRAGMENT
 import org.kiwix.kiwixmobile.core.main.ZIM_HOST_NAV_DEEP_LINK
 import org.kiwix.kiwixmobile.core.page.bookmark.BookmarksFragment
+import org.kiwix.kiwixmobile.core.page.bookmark.viewmodel.BookmarkViewModel
 import org.kiwix.kiwixmobile.core.page.history.HistoryFragment
+import org.kiwix.kiwixmobile.core.page.history.viewmodel.HistoryViewModel
 import org.kiwix.kiwixmobile.core.page.notes.NotesFragment
+import org.kiwix.kiwixmobile.core.page.notes.viewmodel.NotesViewModel
 import org.kiwix.kiwixmobile.core.search.NAV_ARG_SEARCH_STRING
 import org.kiwix.kiwixmobile.core.search.SearchFragment
 import org.kiwix.kiwixmobile.core.settings.SettingsScreenRoute
 import org.kiwix.kiwixmobile.core.utils.EXTRA_IS_WIDGET_VOICE
 import org.kiwix.kiwixmobile.core.utils.TAG_FROM_TAB_SWITCHER
+import org.kiwix.kiwixmobile.core.utils.datastore.KiwixDataStore
 import org.kiwix.kiwixmobile.core.utils.dialog.AlertDialogShower
 import org.kiwix.kiwixmobile.help.KiwixHelpViewModel
 import org.kiwix.kiwixmobile.intro.IntroScreenRoute
@@ -77,6 +81,9 @@ import org.kiwix.kiwixmobile.localFileTransfer.URIS_KEY
 import org.kiwix.kiwixmobile.nav.destination.library.local.LocalLibraryFragment
 import org.kiwix.kiwixmobile.nav.destination.library.online.OnlineLibraryFragment
 import org.kiwix.kiwixmobile.nav.destination.reader.KiwixReaderFragment
+import org.kiwix.kiwixmobile.page.bookmarks.BookmarksScreenRoute
+import org.kiwix.kiwixmobile.page.history.HistoryScreenRoute
+import org.kiwix.kiwixmobile.page.notes.NotesScreenRoute
 import org.kiwix.kiwixmobile.settings.KiwixSettingsViewModel
 import org.kiwix.kiwixmobile.webserver.ZimHostFragment
 
@@ -87,6 +94,7 @@ fun KiwixNavGraph(
   startDestination: String,
   modifier: Modifier = Modifier,
   viewModelFactory: ViewModelProvider.Factory,
+  kiwixDataStore: KiwixDataStore,
   alertDialogShower: AlertDialogShower
 ) {
   NavHost(
@@ -124,14 +132,22 @@ fun KiwixNavGraph(
       }
     }
     composable(KiwixDestination.Bookmarks.route) {
-      FragmentContainer(R.id.bookmarksFragmentContainer) {
-        BookmarksFragment()
-      }
+      val bookmarkViewModel: BookmarkViewModel = viewModel(factory = viewModelFactory)
+      BookmarksScreenRoute(
+        navigateBack = navController::popBackStack,
+        bookmarkViewModel = bookmarkViewModel,
+        kiwixDataStore = kiwixDataStore,
+        alertDialogShower = alertDialogShower
+      )
     }
     composable(KiwixDestination.Notes.route) {
-      FragmentContainer(R.id.notesFragmentContainer) {
-        NotesFragment()
-      }
+      val notesViewModel: NotesViewModel = viewModel(factory = viewModelFactory)
+      NotesScreenRoute(
+        navigateBack = navController::popBackStack,
+        notesViewModel = notesViewModel,
+        kiwixDataStore = kiwixDataStore,
+        alertDialogShower = alertDialogShower
+      )
     }
     composable(KiwixDestination.Intro.route) {
       IntroScreenRoute(
@@ -145,9 +161,13 @@ fun KiwixNavGraph(
       )
     }
     composable(KiwixDestination.History.route) {
-      FragmentContainer(R.id.historyFragmentContainer) {
-        HistoryFragment()
-      }
+      val historyViewModel: HistoryViewModel = viewModel(factory = viewModelFactory)
+      HistoryScreenRoute(
+        navigateBack = navController::popBackStack,
+        historyViewModel = historyViewModel,
+        kiwixDataStore = kiwixDataStore,
+        alertDialogShower = alertDialogShower
+      )
     }
     composable(KiwixDestination.Language.route) {
       LanguageScreenRoute(

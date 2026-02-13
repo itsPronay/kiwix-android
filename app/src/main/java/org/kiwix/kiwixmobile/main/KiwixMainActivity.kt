@@ -161,6 +161,7 @@ class KiwixMainActivity : CoreMainActivity() {
         shouldShowBottomAppBar = shouldShowBottomAppBar.value,
         bottomAppBarScrollBehaviour = bottomAppBarScrollBehaviour,
         viewModelFactory = viewModelFactory,
+        kiwixDataStore = kiwixDataStore,
         alertDialogShower = alertDialogShower
       )
       LaunchedEffect(Unit) {
